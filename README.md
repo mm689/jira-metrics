@@ -11,7 +11,7 @@ Generates `.csv` datasets and `.pdf` graphs relating to iterations, issues and t
 ## Usage
 ### 1. Create config file
 
-JIRA Project and agile Board configuration is stored in `configs.txt`. You can produce this yourself, or your company may have a template to use.
+JIRA Project and agile Board configuration is stored in `configs.txt`. You can produce this yourself, or your company may have a template to use. To help with writing this, `make get-boards` will retrieve the details of all boards you have access to.
 
 Each line of `configs.txt` should be in the format `<project>/<board>`, where:
   - `project` is the JIRA internal name: it should be visible in your URL bar as `projectKey=<project>` when viewing the relevant board

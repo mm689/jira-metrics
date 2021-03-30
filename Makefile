@@ -116,6 +116,9 @@ $(DIR)/issues.csv: retrieve.py $(BASE_CONFIG)
 	@$(MAKE) docker-built-python
 	$(PYTHON) ./$< $(ARGS)
 
+get-boards get-all-boards: $(BASE_CONFIG)
+	./retrieve.py --get-all-boards
+
 config-exists-for-%:
 	@[ -f configs.txt ] || (echo "Error: no configs.txt file found." >&2 && exit 1)
 	@$(CONFIG_FROM_WILDCARD) >/dev/null || ( \

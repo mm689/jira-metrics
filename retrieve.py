@@ -6,23 +6,26 @@ import json
 from pprint import pprint
 from urllib.parse import urlencode
 
-def config(name: str, arg_index: int = None):
+def config(name: str, arg_index: int = None, optional: bool = False):
     if arg_index is not None and len(sys.argv) > arg_index:
         return sys.argv[arg_index]
     try:
         with open('.' + name, 'r') as config_file:
             return config_file.read().replace('\n', '')
     except FileNotFoundError:
+        if optional:
+            return None
         print("No " + name + " configuration. Try running this via make.")
         exit(1)
 
 ESTIMATE_FIELDS = ['customfield_10026', 'customfield_10016']
 
-OUTPUT_TO = config('directory', 3)
+GET_BOARDS_ONLY = '--get-all-boards' in sys.argv
+OUTPUT_TO = config('directory', 3, GET_BOARDS_ONLY)
 EMAIL = config('email')
 PASSWORD = config('apikey')
-PROJECT = config('project', 1)
-BOARD = config('board', 2)
+PROJECT = config('project', 1, GET_BOARDS_ONLY)
+BOARD = config('board', 2, GET_BOARDS_ONLY)
 JIRA = config('jira-url').rstrip('/')
 RESULTS_PER_PAGE = 50
 
@@ -138,27 +141,46 @@ def all_board_names():
         lambda board : {
             'id': board['id'],
             'name': board['name'],
+            'projectKey': board['location']['projectKey'],
             'projectName': board['location']['projectName'],
             'type': board['type']
         })
     return [b for b in all_boards if b['type'] == 'scrum' or b['type'] == 'simple']
 
+# List all board/project pairings
+def print_all_boards(board = None, project = None, all_boards = None):
+    if all_boards is None:
+        all_boards = all_board_names()
+    all_boards = sorted(all_boards, key=lambda b: (b['projectName'] + b['name']).lower())
+    print("\nAll available scrum boards:", file=sys.stderr)
+    all_boards.insert(0, { 'name': 'Board name to use', 'projectKey': 'Project ID', 'projectName': 'Project name (do not use)'})
+    all_boards.insert(1, { 'name': '-----', 'projectKey': '----------', 'projectName': '-----'})
+    name_width = max([ len(b['name']) for b in all_boards])
+    proj_width = max([ len(b['projectKey']) for b in all_boards])
+    print('\n'.join([
+        ('{0:>'+str(name_width)+'} | {1:<'+str(proj_width)+'} | {2:<}')
+            .format(b['name'], b['projectKey'], b['projectName'])
+        for b in all_boards]), file=sys.stderr)
+
+# From the list of all boards, try to guess which one(s) the user wants
+def guess_board(board = None, project = None, all_boards = None):
+    if all_boards is None:
+        all_boards = all_board_names()
+    candidates = [ b for b in all_boards if b['projectName'] == board ]
+    if len(candidates) == 1:
+        return candidates
+    return [ b for b in all_boards if project is None or b['projectKey'].lower() == project.lower() ]
+
 # Retrieve metadata about a given board, or give a helpful error
-def board(name):
+def board(name, project):
     details = retrieve('/rest/agile/1.0/board?' + urlencode({ 'name': name }))
     if len(details['values']) == 0:
         all_boards = all_board_names()
-        board_from_display_name = [ b for b in all_boards if b['projectName'] == name ]
-        if len(board_from_display_name) == 1:
-            raise ValueError("Project name used instead of board name.\n\n" +
-            "To resolve, please replace \"{}\" with \"{}\" in your configuration.\n".format(name, board_from_display_name[0]['name']))
-        print("\nAll available scrum boards:", file=sys.stderr)
-        all_boards.insert(0, { 'name': 'Name for configuration', 'projectName': 'Project name (do not use)'})
-        all_boards.insert(1, { 'name': '-----', 'projectName': '-----'})
-        name_width = max([ len(b['name']) for b in all_boards])
-        print('\n'.join([
-            ('{0:>'+str(name_width)+'} | {1:<}').format(b['name'], b['projectName'])
-            for b in all_boards]), file=sys.stderr)
+        candidates = guess_board(name, project, all_boards)
+        if len(candidates) == 1:
+            raise ValueError("Invalid board name\n\n" +
+            "To resolve, replace \"{}\" with \"{}\" in your configuration or run `make get-boards`.\n".format(name, candidates[0]['name']))
+        print_all_boards(project, all_boards)
         raise ValueError("Board '{}' not found. Please update configs to indicate one of the above".format(name))
     return details['values'][0]
 
@@ -176,8 +198,8 @@ def sprint_details(details):
         'issues': ';'.join(issue_keys)
     }
 
-def sprints(board_name):
-    board_details = board(board_name)
+def sprints(board_name, project_id):
+    board_details = board(board_name, project_id)
     return retrieve_all(
         '/rest/agile/1.0/board/{}/sprint?'.format(board_details['id']),
         lambda row: row['values'],
@@ -205,12 +227,16 @@ def write(name, dataset):
     write_csv(name, dataset)
     write_json(name, dataset)
 
+if GET_BOARDS_ONLY:
+    print_all_boards()
+    exit(0)
+
 # Retrieve all data
 
 issues = issues('project=' + PROJECT)
 write('issues', issues)
 
-iterations = sprints(BOARD)
+iterations = sprints(BOARD, PROJECT)
 write('iterations', iterations)
 
 # Warning: this will send off quite a number of API calls
