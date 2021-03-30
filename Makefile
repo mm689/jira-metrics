@@ -125,9 +125,9 @@ config-exists-for-%:
 			|| echo "Error: project '$*' not found in configs.txt" >&2) \
 		&& exit 1)
 regen-%: config-exists-for-%
-	@echo "Recalculating board $$(\
-		$(CONFIG_FROM_WILDCARD) | cut -d/ -f1) of project $$(\
-		$(CONFIG_FROM_WILDCARD) | cut -d/ -f2)."
+	@echo "Recalculating board \"$$(\
+		$(CONFIG_FROM_WILDCARD) | cut -d/ -f2)\" of project \"$$(\
+		$(CONFIG_FROM_WILDCARD) | cut -d/ -f1)\"."
 	@$(MAKE_FROM_WILDCARD) -W .jira-url view-team-visualisations
 
 .email:
