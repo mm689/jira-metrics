@@ -49,8 +49,8 @@ table-team: $(DIR)/table-team.html
 comparison-table summary table: table.html
 	open $<
 summary-incl-raw: all.iterations.incl.raw.csv
+	@echo "See $@ for raw and change data. Be wary of comparing raw data between teams!"
 	@echo "Note: tabular presentation is not yet available for raw data." >&2
-	@echo "See ./$< for the dataset itself." >&2
 comparison-table-incl-raw table-incl-raw: table-incl-raw.html
 	open $<
 
@@ -94,7 +94,6 @@ all.iterations.csv: combine.r $(shell ls *_*/augmented/iterations.full.csv 2>/de
 	@echo "Combined data for all projects can now be found in: $@"
 all.iterations.incl.raw.csv: combine.r $(shell ls *_*/augmented/iterations.full.csv 2>/dev/null || echo "$(DIR)/augmented/iterations.full.csv")
 	$(R) ./$< --include-raw-data
-	@echo "See $@ for raw and change data. Be wary of comparing raw data between teams!"
 
 $(DIR)/augmented/metrics.csv: combine.r $(DIR)/augmented/iterations.full.csv
 	$(R) ./$< $(ARGS) --include-raw-data
@@ -110,7 +109,7 @@ $(DIR)/graphs.pdf: graph.r $(DIR)/augmented/iterations.full.csv
 
 $(DIR)/issues.csv: retrieve.py $(BASE_CONFIG)
 	@([[ -n "$(PROJECT)" ]] && [[ -n "$(BOARD)" ]]) || ( \
-		echo 'No configuration found: please run `make` or `make-<project>`.' >&2 && exit 1)
+		echo 'No configuration found: please run `make`, `make-<project>` or `make compare-teams`.' >&2 && exit 1)
 	@[ -d $(DIR) ] || mkdir $(DIR)
 	@echo "$(PROJECT)" >$(DIR)/.project
 	@echo "$(BOARD)" >$(DIR)/.board
