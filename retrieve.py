@@ -132,11 +132,34 @@ def transitions(jql):
     return [ changeset for issue_changesets in all_changesets
         for changeset in issue_changesets]
 
-# Retrieve metadata about a given board
+def all_board_names():
+    all_boards = retrieve_all('/rest/agile/1.0/board/?',
+        lambda row : row['values'],
+        lambda board : {
+            'id': board['id'],
+            'name': board['name'],
+            'projectName': board['location']['projectName'],
+            'type': board['type']
+        })
+    return [b for b in all_boards if b['type'] == 'scrum' or b['type'] == 'simple']
+
+# Retrieve metadata about a given board, or give a helpful error
 def board(name):
     details = retrieve('/rest/agile/1.0/board?' + urlencode({ 'name': name }))
     if len(details['values']) == 0:
-        raise ValueError("Board '{}' not found".format(name))
+        all_boards = all_board_names()
+        board_from_display_name = [ b for b in all_boards if b['projectName'] == name ]
+        if len(board_from_display_name) == 1:
+            raise ValueError("Project name used instead of board name.\n\n" +
+            "To resolve, please replace \"{}\" with \"{}\" in your configuration.\n".format(name, board_from_display_name[0]['name']))
+        print("\nAll available scrum boards:", file=sys.stderr)
+        all_boards.insert(0, { 'name': 'Name for configuration', 'projectName': 'Project name (do not use)'})
+        all_boards.insert(1, { 'name': '-----', 'projectName': '-----'})
+        name_width = max([ len(b['name']) for b in all_boards])
+        print('\n'.join([
+            ('{0:>'+str(name_width)+'} | {1:<}').format(b['name'], b['projectName'])
+            for b in all_boards]), file=sys.stderr)
+        raise ValueError("Board '{}' not found. Please update configs to indicate one of the above".format(name))
     return details['values'][0]
 
 # Simplify the dict relating to a sprint to just store iteration info
@@ -184,7 +207,6 @@ def write(name, dataset):
 
 # Retrieve all data
 
-# issues = issue('CAR-256')
 issues = issues('project=' + PROJECT)
 write('issues', issues)
 
