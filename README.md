@@ -7,22 +7,22 @@ Generates `.csv` datasets and `.pdf` graphs relating to iterations, issues and t
 ## Requirements
 - Docker
 - A [Jira API key](https://id.atlassian.com/manage-profile/security/api-tokens)
+- [jq](https://stedolan.github.io/jq/) (`brew install jq`)
 
 ## Usage
 ### 1. Create config file
 
-JIRA Project and agile Board configuration is stored in `configs.txt`. You can produce this yourself, or your company may have a template to use. To help with writing this, `make get-boards` will retrieve the details of all boards you have access to.
+JIRA Project and agile Board configuration is stored in `configs.json`. You can produce this yourself, or your company may have a template to use. To help with writing this, `make get-boards` will retrieve the details of all boards you have access to.
 
-Each line of `configs.txt` should be in the format `<project>/<board>`, where:
-  - `project` is the JIRA internal name: it should be visible in your URL bar as `projectKey=<project>` when viewing the relevant board
-  - `board` is the human-friendly board name: it should be visible in the [breadcrumbs](https://en.wikipedia.org/wiki/Breadcrumb_navigation#Websites) when viewing the board's page:
+`configs.json` should contain an array of JSON objects, each containing:
+  - `project` (_required_) is the JIRA internal name: it should be visible in your URL bar as `projectKey=<project>` when viewing the relevant board
+  - `board` (_required_) is the human-friendly board name: it should be visible in the [breadcrumbs](https://en.wikipedia.org/wiki/Breadcrumb_navigation#Websites) when viewing the board's page:
   ![image](https://user-images.githubusercontent.com/74246482/112482485-071b1100-8d70-11eb-8956-cf86e2f8dc10.png)
-
-Example `configs.txt` file:
+,
+Example `configs.json` file:
 ```
-# comments work too!
-PROJ1/Board One
-PROJ2/Board Two
+[{ "project": "PROJ1", "board": "Board One" },
+ { "project": "PROJ2", "board": "Board Two" }]
 ```
 
 ### 3. Get metrics for a single project

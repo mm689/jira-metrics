@@ -15,16 +15,15 @@ BASE_CONFIG=.apikey .email .jira-url
 DIR=$(shell echo "$(PROJECT) $(BOARD)" | tr '[A-Z]' '[a-z]' | tr '/' ' ' | tr -d '-' | sed -E "s/ +/_/g")
 ARGS=$(shell [ -n "$(PROJECT)" ] && [ -n "$(BOARD)" ] && echo "'$(PROJECT)' '$(BOARD)' '$(DIR)'")
 
-# Turning configs.txt into meaningful parameters based on a passed-in wildcard
-CONFIGS=cat configs.txt 2>/dev/null | sed -E 's/ *\#.*//' | grep .
-MAKE_ARGS_FROM_CONFIG=sed -E "s|^([^/]+)/(.+)|PROJECT='\\1' BOARD='\\2'|g"
-CONFIG_FROM_PROJECT=$(CONFIGS) | awk "NR==$$($(CONFIGS) | grep -ni "^$*/" | cut -d: -f1)" 2>/dev/null
-CONFIG_FROM_NUMBER=$(CONFIGS) | awk 'NR==$*' 2>/dev/null
+# Turning configs.json into meaningful parameters based on a passed-in wildcard
+CONFIG_INDEX_FROM_PROJECT=map(.project | test("^$*$$"; "i")?) | index(true)
+CONFIG_INDEX=[[ "$*" =~ ^[0-9]+$$ ]] && echo "$$(( $* - 1 ))" || echo '$(CONFIG_INDEX_FROM_PROJECT)'
 
-CONFIG_FROM_WILDCARD=(config=$$($(CONFIG_FROM_NUMBER)) && ([ -n "$$config" ] && echo "$$config") || $(CONFIG_FROM_PROJECT))
-MAKE_FROM_WILDCARD=$(MAKE) $(shell $(CONFIG_FROM_WILDCARD) | $(MAKE_ARGS_FROM_CONFIG))
+CONFIG_FROM_WILDCARD=jq -e 'nth($(shell $(CONFIG_INDEX)))?' configs.json
+MAKE_FROM_WILDCARD=$(MAKE) $(shell jq -r 'nth($(shell $(CONFIG_INDEX))) | ("PROJECT=\""+.project + "\" BOARD=\""+.board+"\"")' configs.json)
+ALL_PRESETS=preset-1 $(shell jq 'to_entries | del(.[0]) | map("preset-"+(.key+1 | tostring)) | join(" ")' configs.json 2>/dev/null)
 
-# Default rule: generate and view data for the first team in configs.txt
+# Default rule: generate and view data for the first team in configs.json
 view: view-1
 
 view-team-visualisations: $(DIR)/graphs.pdf $(DIR)/table-team.html
@@ -41,7 +40,6 @@ preset-%: config-exists-for-%
 	@echo
 	$(MAKE_FROM_WILDCARD) generate-team-visualisations
 
-ALL_PRESETS=$(shell ($(CONFIGS) || echo "1") | grep . -n | cut -d: -f1 | sed "s/.*/preset-&/")
 all all-teams compare-teams presets: $(ALL_PRESETS) comparison-table
 
 table-team: $(DIR)/table-team.html
@@ -120,11 +118,13 @@ get-boards get-all-boards: $(BASE_CONFIG)
 	./retrieve.py --get-all-boards
 
 config-exists-for-%:
-	@[ -f configs.txt ] || (echo "Error: no configs.txt file found." >&2 && exit 1)
+	@[ -f configs.json ] || (echo "Error: no configs.json file found." >&2 && exit 1)
+	@jq -e 'type=="array" and (map(type=="object" and has("project") and has("board")) | index(false) == null)' configs.json >/dev/null || \
+		(echo "Error: configs.json must contain an array of objects, each specifying 'board' and 'project'" >&2 && exit 1)
 	@$(CONFIG_FROM_WILDCARD) >/dev/null || ( \
 		([[ "$*" =~ ^[0-9]+$$ ]] \
-			&& echo "Error: fewer than $* project(s) defined in configs.txt" >&2 \
-			|| echo "Error: project '$*' not found in configs.txt" >&2) \
+			&& echo "Error: fewer than $* projects defined in config.json" >&2 \
+			|| echo "Error: project '$*' not found in configs.json" >&2) \
 		&& exit 1)
 regen-%: config-exists-for-%
 	@echo "Recalculating board \"$$(\
